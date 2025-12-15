@@ -1,23 +1,16 @@
 import { chromium } from "playwright";
 import * as cheerio from "cheerio";
 
-
 function parseCount(text: string): number {
   if (!text) return 0;
 
   const clean = text.replace(/,/g, "").trim();
 
-  if (clean.endsWith("K")) {
-    return Math.round(parseFloat(clean) * 1000);
-  }
-
-  if (clean.endsWith("M")) {
-    return Math.round(parseFloat(clean) * 1_000_000);
-  }
+  if (clean.endsWith("K")) return Math.round(parseFloat(clean) * 1_000);
+  if (clean.endsWith("M")) return Math.round(parseFloat(clean) * 1_000_000);
 
   return parseInt(clean, 10) || 0;
 }
-
 
 function extractCountFromAria(
   element: cheerio.Cheerio,
@@ -29,9 +22,7 @@ function extractCountFromAria(
 
   if (aria) {
     const match = aria.match(/([\d,.]+)/);
-    if (match) {
-      return parseCount(match[1]);
-    }
+    if (match) return parseCount(match[1]);
   }
 
   const text = element
@@ -41,6 +32,27 @@ function extractCountFromAria(
   return parseCount(text);
 }
 
+/**
+ * ✅ CORRECT WAY TO GET VIEWS
+ * Twitter often renders views as:
+ * <span aria-label="12,345 Views">
+ */
+function extractViews(element: cheerio.Cheerio): number {
+  let views = 0;
+
+  element.find("span[aria-label]").each((_, el) => {
+    const aria = el.attribs?.["aria-label"];
+    if (aria && aria.toLowerCase().includes("views")) {
+      const match = aria.match(/([\d,.]+)/);
+      if (match) {
+        views = parseCount(match[1]);
+      }
+    }
+  });
+
+  return views;
+}
+
 export type ScrapedTweet = {
   id: string;
   username: string;
@@ -48,6 +60,7 @@ export type ScrapedTweet = {
   likes: number;
   retweets: number;
   replies: number;
+  views: number;
   timestamp: string;
 };
 
@@ -67,14 +80,20 @@ export async function scrapeTweets(
 
   const url = `https://twitter.com/search?q=${encodeURIComponent(
     keyword
-  )}&f=live`;
+  )}`;
 
   await page.goto(url, { waitUntil: "domcontentloaded" });
-  await page.waitForTimeout(5000);
+  await page.waitForSelector("article", { timeout: 15000 });
 
   const collected = new Map<string, ScrapedTweet>();
 
-  for (let scroll = 0; scroll < 8; scroll++) {
+  let lastCount = 0;
+
+  for (let scroll = 0; scroll < 12; scroll++) {
+    // Scroll FIRST
+    await page.mouse.wheel(0, 5000);
+    await page.waitForTimeout(2500);
+
     const html = await page.content();
     const $ = cheerio.load(html);
 
@@ -92,12 +111,13 @@ export async function scrapeTweets(
 
       if (!tweetText || !username) return;
 
-      const key = `${username}-${tweetText.slice(0, 60)}`;
+      const key = `${username}-${tweetText.slice(0, 80)}`;
       if (collected.has(key)) return;
 
       const likes = extractCountFromAria($(element), "like");
       const retweets = extractCountFromAria($(element), "retweet");
       const replies = extractCountFromAria($(element), "reply");
+      const views = extractViews($(element));
 
       const timestamp =
         $(element).find("time").attr("datetime") ??
@@ -110,15 +130,16 @@ export async function scrapeTweets(
         likes,
         retweets,
         replies,
+        views,
         timestamp,
       });
     });
 
+    // Stop if we stopped discovering new tweets
+    if (collected.size === lastCount) break;
+    lastCount = collected.size;
+
     if (collected.size >= 50) break;
-
-
-    await page.mouse.wheel(0, 4000);
-    await page.waitForTimeout(2500);
   }
 
   await context.close();

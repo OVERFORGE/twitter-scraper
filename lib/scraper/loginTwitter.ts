@@ -7,7 +7,7 @@ const COOKIES_PATH = path.join(process.cwd(), "cookies", "twitter.json");
 (async () => {
   const browser = await chromium.launch({
     headless: false,
-    slowMo: 100, // HUMAN SPEED
+    slowMo: 100, 
   });
 
   const context = await browser.newContext({
@@ -25,9 +25,9 @@ const COOKIES_PATH = path.join(process.cwd(), "cookies", "twitter.json");
     waitUntil: "domcontentloaded",
   });
 
-  console.log("👉 Log in manually like a normal user.");
-  console.log("👉 If Twitter asks for phone/email verification, complete it.");
-  console.log("👉 AFTER you see your home feed, come back here and press ENTER.");
+  console.log("Log in manually like a normal user.");
+  console.log("If Twitter asks for phone/email verification, complete it.");
+  console.log("AFTER you see your home feed, come back here and press ENTER.");
 
   await new Promise((resolve) => {
     process.stdin.once("data", resolve);
@@ -36,7 +36,7 @@ const COOKIES_PATH = path.join(process.cwd(), "cookies", "twitter.json");
   const cookies = await context.cookies();
   fs.writeFileSync(COOKIES_PATH, JSON.stringify(cookies, null, 2));
 
-  console.log("✅ Cookies saved successfully");
+  console.log("Cookies saved successfully");
 
   await browser.close();
 })();

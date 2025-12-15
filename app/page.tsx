@@ -1,65 +1,329 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useMemo, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
+
+type Tweet = {
+  id: string;
+  username: string;
+  text: string;
+  likes: number;
+  retweets: number;
+  replies: number;
+  views: number;
+  timestamp: string;
+};
+
+const PAGE_SIZE = 10;
+
+export default function Dashboard() {
+  const [keyword, setKeyword] = useState("");
+  const [tweets, setTweets] = useState<Tweet[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+
+  async function fetchTweets() {
+    const res = await fetch("/api/tweets");
+    const data = await res.json();
+    setTweets(data);
+  }
+
+  async function handleScrape() {
+    if (!keyword.trim()) return;
+
+    setLoading(true);
+    setError("");
+
+    try {
+      await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keyword }),
+      });
+      await fetchTweets();
+      setPage(1);
+    } catch {
+      setError("Scraping failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchTweets();
+  }, []);
+
+  /* ---------------- ANALYTICS ---------------- */
+
+  const totalTweets = tweets.length;
+
+  const totalEngagement = useMemo(
+    () =>
+      tweets.reduce(
+        (sum, t) => sum + t.likes + t.retweets + t.replies,
+        0
+      ),
+    [tweets]
+  );
+
+  const totalViews = useMemo(
+    () => tweets.reduce((sum, t) => sum + t.views, 0),
+    [tweets]
+  );
+
+  const avgEngagement =
+    totalTweets > 0
+      ? (totalEngagement / totalTweets).toFixed(2)
+      : "0";
+
+  const avgViews =
+    totalTweets > 0
+      ? Math.round(totalViews / totalTweets)
+      : 0;
+
+  const avgEngagementRate =
+    totalViews > 0
+      ? ((totalEngagement / totalViews) * 100).toFixed(2)
+      : "0";
+
+  const topTweet = useMemo(() => {
+    if (tweets.length === 0) return null;
+    return tweets.reduce((best, curr) => {
+      const b =
+        best.likes + best.retweets + best.replies;
+      const c =
+        curr.likes + curr.retweets + curr.replies;
+      return c > b ? curr : best;
+    });
+  }, [tweets]);
+
+  /* ---------------- CHART ---------------- */
+
+  const tweetsPerHour = useMemo(() => {
+    const map: Record<string, number> = {};
+
+    tweets.forEach((t) => {
+      const hour = new Date(t.timestamp)
+        .toISOString()
+        .slice(0, 13);
+      map[hour] = (map[hour] || 0) + 1;
+    });
+
+    return Object.entries(map)
+      .sort()
+      .map(([hour, count]) => ({
+        hour: hour.replace("T", " "),
+        count,
+      }));
+  }, [tweets]);
+
+  /* ---------------- PAGINATION ---------------- */
+
+  const totalPages = Math.ceil(tweets.length / PAGE_SIZE);
+
+  const paginatedTweets = tweets.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  );
+
+  /* ---------------- CSV ---------------- */
+
+  function exportCSV() {
+    const header =
+      "username,text,likes,retweets,replies,views,timestamp\n";
+
+    const rows = tweets
+      .map((t) =>
+        [
+          t.username,
+          `"${t.text.replace(/"/g, '""')}"`,
+          t.likes,
+          t.retweets,
+          t.replies,
+          t.views,
+          t.timestamp,
+        ].join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([header + rows], {
+      type: "text/csv",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "tweets.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="max-w-7xl mx-auto px-6 py-10 space-y-10">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-semibold">
+            Twitter Analytics Dashboard
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-slate-400 text-sm">
+            Scrape, analyze & measure engagement
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* Controls */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex gap-3">
+          <input
+            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2 placeholder-slate-500 focus:ring-2 focus:ring-violet-500 outline-none"
+            placeholder="Keyword (e.g. ethereum)"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+          <button
+            onClick={handleScrape}
+            className="bg-violet-600 hover:bg-violet-500 transition px-6 py-2 rounded-lg font-medium"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            {loading ? "Scraping…" : "Scrape"}
+          </button>
+          <button
+            onClick={exportCSV}
+            className="border border-slate-700 hover:bg-slate-800 transition px-5 py-2 rounded-lg"
           >
-            Documentation
-          </a>
+            Export CSV
+          </button>
         </div>
-      </main>
+
+        {/* Analytics */}
+        <div className="grid md:grid-cols-4 gap-6">
+          <StatCard label="Total Tweets" value={totalTweets} />
+          <StatCard label="Avg Engagement" value={avgEngagement} />
+          <StatCard label="Avg Views" value={avgViews} />
+          <StatCard
+            label="Avg Engagement Rate"
+            value={`${avgEngagementRate}%`}
+          />
+        </div>
+
+        {/* Chart */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 h-72 pb-10">
+          <h2 className="text-lg font-medium mb-4">
+            Tweets per Hour
+          </h2>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={tweetsPerHour}>
+              <CartesianGrid stroke="#1e293b" />
+              <XAxis dataKey="hour" stroke="#94a3b8" />
+              <YAxis stroke="#94a3b8" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "#020617",
+                  border: "1px solid #1e293b",
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Table */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <table className="min-w-full text-sm">
+            <thead className="bg-slate-800 text-slate-300">
+              <tr>
+                <th className="px-4 py-3 text-left">User</th>
+                <th className="px-4 py-3 text-left">Tweet</th>
+                <th className="px-4 py-3 text-center">Like</th>
+                <th className="px-4 py-3 text-center">Reposts</th>
+                <th className="px-4 py-3 text-center">Comments</th>
+                <th className="px-4 py-3 text-center">Views</th>
+                <th className="px-4 py-3 text-left">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedTweets.map((t) => (
+                <tr
+                  key={t.id}
+                  className="border-t border-slate-800 hover:bg-slate-800 transition"
+                >
+                  <td className="px-4 py-3 font-medium">
+                    @{t.username}
+                  </td>
+                  <td className="px-4 py-3 max-w-xl text-slate-400">
+                    {t.text}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {t.likes}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {t.retweets}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {t.replies}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {t.views}
+                  </td>
+                  <td className="px-4 py-3 text-slate-400">
+                    {new Date(t.timestamp).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          <div className="flex justify-between items-center px-4 py-3 border-t border-slate-800">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1 rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <span className="text-slate-400">
+              Page {page} / {totalPages}
+            </span>
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1 rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-violet-500 transition">
+      <p className="text-slate-400 text-sm">{label}</p>
+      <p className="text-3xl font-semibold mt-1">
+        {value}
+      </p>
     </div>
   );
 }
