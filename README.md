@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Twitter/X Scraper + Mini Dashboard
 
-## Getting Started
+A small full-stack tool that scrapes recent tweets from Twitter/X using browser automation and displays them in a clean, interactive dashboard with basic analytics.
 
-First, run the development server:
 
-```bash
+
+Architecture Overview
+The project is split into three main layers:
+
+1. Scraper (Backend)
+Uses Playwright (Chrome) to load Twitter/X search results
+Parses the rendered HTML using Cheerio
+Supports keyword-based scraping from the live search feed
+Extracts tweet-level metrics and metadata
+Stores results in a local JSON file
+
+2. API Layer (Next.js)
+
+/api/scrape
+Triggers a new scrape for a given keyword and replaces previously stored data
+
+/api/tweets
+Reads stored tweet data and serves it to the frontend
+
+3. Dashboard (Frontend)
+
+Built using Next.js App Router
+Displays tweets in a paginated table
+Shows basic analytics (totals, averages, trends)
+Includes CSV export functionality
+
+
+
+Tech Stack Used
+Frontend - Next.js , React , Tailwind CSS , Recharts 
+Backend - Playwright , Cheerio 
+
+Storage 
+Local JSON File
+
+
+
+Data Collected Per Tweet
+
+Each scraped tweet contains:
+Username
+Tweet text
+Likes
+Retweets
+Replies
+Timestamp
+Views (when available)
+
+
+
+
+How to Run the Project
+
+Install dependencies
+npm install
+
+Install Playwright browsers
+npx playwright install
+
+
+(First time only) Login to X
+npx ts-node lib/scraper/loginTwitter.ts
+
+Start the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+How to Use
+Enter a keyword in the input field
+Click Scrape
+The dashboard refreshes with newly collected tweets
+View analytics, browse tweets, or export data as CSV
 
-## Learn More
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Limitations & Assumptions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. View / Impression Counts
+Twitter/X does not reliably expose view counts on search result pages.
 
-## Deploy on Vercel
+Views are only consistently available on individual tweet pages
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+To avoid excessive navigation and rate-limiting, this project does not visit each tweet’s detail page
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+When impressions are not available, views are marked as 0 and engagement rate is shown as N/A
+
+
+2. Rate Limiting & Stability
+craping relies on unofficial methods
+
+Twitter/X may change DOM structure at any time
+
+Excessive scraping can result in temporary blocks
+
+
+3. Data Persistence
+Data is stored locally in a JSON file
+
+Not intended for production or multi-user environments
+
+
