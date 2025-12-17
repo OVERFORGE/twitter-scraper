@@ -3,16 +3,23 @@ import { readTweets } from "@/lib/storage/jsonStore";
 
 export async function GET() {
   try {
-    const tweets = readTweets();
+   
+    if (process.env.NODE_ENV !== "production") {
+      const tweets = readTweets();
+      return NextResponse.json(Array.isArray(tweets) ? tweets : []);
+    }
 
-
-    return NextResponse.json(
-      Array.isArray(tweets) ? tweets : []
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/data/tweets.json`,
+      { cache: "no-store" }
     );
-  } catch (error) {
-    console.error("API /tweets failed:", error);
 
- 
-    return NextResponse.json([], { status: 200 });
+    if (!res.ok) return NextResponse.json([]);
+
+    const data = await res.json();
+    return NextResponse.json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error("GET /api/tweets failed", err);
+    return NextResponse.json([]);
   }
 }
