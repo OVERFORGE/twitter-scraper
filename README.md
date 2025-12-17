@@ -1,107 +1,142 @@
-Twitter/X Scraper + Mini Dashboard
+Twitter / X Scraper & Analytics Dashboard
 
-A small full-stack tool that scrapes recent tweets from Twitter/X using browser automation and displays them in a clean, interactive dashboard with basic analytics.
+A lightweight full-stack application that scrapes recent tweets from Twitter/X using browser automation and presents them in an interactive analytics dashboard. The project is designed to demonstrate scraping workflows, data processing, and frontend analytics rather than to act as a production-ready crawler.
 
 
+Overview
+
+This tool allows users to:
+Scrape recent tweets based on a keyword
+Extract engagement metrics and metadata
+Analyze trends and engagement statistics
+View and sort tweets in a paginated dashboard
+Export collected data as CSV
+
+Due to platform restrictions, scraping is supported only in local development. The deployed version runs in a read-only “demo mode” using a preloaded dataset.
 
 Architecture Overview
-The project is split into three main layers:
+
+The project is structured into three logical layers:
 
 1. Scraper (Backend)
-Uses Playwright (Chrome) to load Twitter/X search results
-Parses the rendered HTML using Cheerio
-Supports keyword-based scraping from the live search feed
-Extracts tweet-level metrics and metadata
-Stores results in a local JSON file
+Uses Playwright (Chromium) to render Twitter/X search results
+Operates with a real Chrome user profile for authentication
+Parses rendered HTML using Cheerio
+Supports keyword-based scraping from Twitter search pages
+Extracts tweet-level metadata and engagement metrics
+Writes results to a local JSON file during development
 
-2. API Layer (Next.js)
+2. API Layer (Next.js App Router)
+Endpoint	Description
+POST /api/scrape	Triggers a new scrape for a given keyword (development only)
+GET /api/tweets	Returns stored tweet data to the frontend
 
-/api/scrape
-Triggers a new scrape for a given keyword and replaces previously stored data
-
-/api/tweets
-Reads stored tweet data and serves it to the frontend
+The API layer abstracts data access and enables the frontend to remain environment-agnostic.
 
 3. Dashboard (Frontend)
+Built with Next.js App Router
+Responsive UI styled using Tailwind CSS
+Displays tweets in a paginated, sortable table
+Highlights the most engaging tweet
+Shows aggregate analytics and engagement trends
+Provides CSV export for offline analysis
+Uses Recharts for time-based visualizations
 
-Built using Next.js App Router
-Displays tweets in a paginated table
-Shows basic analytics (totals, averages, trends)
-Includes CSV export functionality
+Tech Stack
 
+Frontend
+Next.js
+React
+Tailwind CSS
+Recharts
 
+Backend / Scraping
+Playwright (Chromium)
+Cheerio
 
-Tech Stack Used
-Frontend - Next.js , React , Tailwind CSS , Recharts 
-Backend - Playwright , Cheerio 
-
-Storage 
-Local JSON File
-
-
+Storage
+Local JSON file (development)
+Static JSON file (production demo)
 
 Data Collected Per Tweet
-
-Each scraped tweet contains:
+Each scraped tweet includes the following fields:
 Username
 Tweet text
 Likes
 Retweets
 Replies
 Timestamp
-Views (when available)
 
-
-
-
-How to Run the Project
-
-Install dependencies
+How to Run the Project (Local Development)
+1. Install Dependencies
 npm install
 
-Install Playwright browsers
+2. Install Playwright Browsers
 npx playwright install
 
-
-(First time only) Login to X
+3. Authenticate with Twitter/X (One-Time Step)
 npx ts-node lib/scraper/loginTwitter.ts
 
-Start the development server
+
+This opens a real Chrome window where you log in manually.
+Authentication cookies are saved for subsequent scraping sessions.
+
+4. Start the Development Server
 npm run dev
 
-
-
 How to Use
-Enter a keyword in the input field
+Enter a keyword in the search input
 Click Scrape
-The dashboard refreshes with newly collected tweets
-View analytics, browse tweets, or export data as CSV
-
-
+Newly collected tweets replace previous data
+Explore analytics, sort engagement columns, or paginate results
+Export data as CSV if needed
+Deployment Behavior (Vercel)
+This project supports two execution modes:
+Development Mode
+Full scraping enabled
+Data stored locally in data/tweets.json
+Intended for experimentation and learning
+Production Mode (Vercel)
+Scraping disabled
+Uses a static dataset served from public/data/tweets.json
+Demonstrates analytics, UI, and data handling without violating platform constraints
+This approach ensures the application can be reviewed remotely while keeping scraping logic compliant with serverless limitations.
 
 Limitations & Assumptions
+View / Impression Counts
 
-1. View / Impression Counts
-Twitter/X does not reliably expose view counts on search result pages.
+Twitter/X does not consistently expose view counts on search result pages.
+Views are only reliably available on individual tweet pages.
 
-Views are only consistently available on individual tweet pages
+To avoid excessive navigation, rate limiting, and instability, this project does not open each tweet’s detail page. When impressions are unavailable, view counts default to 0, and engagement rate calculations account for this.
 
-To avoid excessive navigation and rate-limiting, this project does not visit each tweet’s detail page
+Rate Limiting & Stability
 
-When impressions are not available, views are marked as 0 and engagement rate is shown as N/A
+Scraping relies on unofficial methods
 
+Twitter/X may change its DOM structure at any time
 
-2. Rate Limiting & Stability
-craping relies on unofficial methods
+Excessive scraping can trigger temporary account restrictions
 
-Twitter/X may change DOM structure at any time
+Data Persistence
 
-Excessive scraping can result in temporary blocks
+Data storage is file-based
 
+Not suitable for multi-user or production environments
 
-3. Data Persistence
-Data is stored locally in a JSON file
+No database or caching layer is used
 
-Not intended for production or multi-user environments
+Intended Use
 
+This project is intended for:
+
+Learning browser automation and scraping workflows
+
+Demonstrating frontend analytics and visualization
+
+Technical assignments and take-home evaluations
+
+Prototyping data pipelines
+
+It is not designed for large-scale or commercial scraping.
 
