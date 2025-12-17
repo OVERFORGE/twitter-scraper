@@ -1,15 +1,18 @@
-import { readTweets } from "@/lib/storage/jsonStore";
 import { NextResponse } from "next/server";
+import { readTweets } from "@/lib/storage/jsonStore";
 
 export async function GET() {
   try {
     const tweets = readTweets();
-    return NextResponse.json(tweets);
-  } catch (err) {
-    console.error("Failed to read tweets", err);
+
+
     return NextResponse.json(
-      { error: "Failed to load tweets" },
-      { status: 500 }
+      Array.isArray(tweets) ? tweets : []
     );
+  } catch (error) {
+    console.error("API /tweets failed:", error);
+
+ 
+    return NextResponse.json([], { status: 200 });
   }
 }
