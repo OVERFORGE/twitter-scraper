@@ -22,14 +22,18 @@ type Tweet = {
   timestamp: string;
 };
 
+type SortKey = "likes" | "retweets" | "replies" | null;
+
 const PAGE_SIZE = 10;
 
 export default function Dashboard() {
   const [keyword, setKeyword] = useState("");
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
+
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   async function fetchTweets() {
     const res = await fetch("/api/tweets");
@@ -41,8 +45,6 @@ export default function Dashboard() {
     if (!keyword.trim()) return;
 
     setLoading(true);
-    setError("");
-
     try {
       await fetch("/api/scrape", {
         method: "POST",
@@ -51,8 +53,6 @@ export default function Dashboard() {
       });
       await fetchTweets();
       setPage(1);
-    } catch {
-      setError("Scraping failed");
     } finally {
       setLoading(false);
     }
@@ -61,6 +61,15 @@ export default function Dashboard() {
   useEffect(() => {
     fetchTweets();
   }, []);
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortOrder((p) => (p === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortOrder("desc");
+    }
+  }
 
   /* ---------------- ANALYTICS ---------------- */
 
@@ -86,9 +95,7 @@ export default function Dashboard() {
       : "0";
 
   const avgViews =
-    totalTweets > 0
-      ? Math.round(totalViews / totalTweets)
-      : 0;
+    totalTweets > 0 ? Math.round(totalViews / totalTweets) : 0;
 
   const avgEngagementRate =
     totalViews > 0
@@ -98,23 +105,35 @@ export default function Dashboard() {
   const topTweet = useMemo(() => {
     if (tweets.length === 0) return null;
     return tweets.reduce((best, curr) => {
-      const b =
-        best.likes + best.retweets + best.replies;
-      const c =
-        curr.likes + curr.retweets + curr.replies;
+      const b = best.likes + best.retweets + best.replies;
+      const c = curr.likes + curr.retweets + curr.replies;
       return c > b ? curr : best;
     });
   }, [tweets]);
+
+  /* ---------------- SORT + PAGINATION ---------------- */
+
+  const sortedTweets = useMemo(() => {
+    if (!sortKey) return tweets;
+    return [...tweets].sort((a, b) => {
+      const diff = a[sortKey] - b[sortKey];
+      return sortOrder === "asc" ? diff : -diff;
+    });
+  }, [tweets, sortKey, sortOrder]);
+
+  const totalPages = Math.ceil(sortedTweets.length / PAGE_SIZE);
+
+  const paginatedTweets = sortedTweets.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE
+  );
 
   /* ---------------- CHART ---------------- */
 
   const tweetsPerHour = useMemo(() => {
     const map: Record<string, number> = {};
-
     tweets.forEach((t) => {
-      const hour = new Date(t.timestamp)
-        .toISOString()
-        .slice(0, 13);
+      const hour = new Date(t.timestamp).toISOString().slice(0, 13);
       map[hour] = (map[hour] || 0) + 1;
     });
 
@@ -126,21 +145,11 @@ export default function Dashboard() {
       }));
   }, [tweets]);
 
-  /* ---------------- PAGINATION ---------------- */
-
-  const totalPages = Math.ceil(tweets.length / PAGE_SIZE);
-
-  const paginatedTweets = tweets.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE
-  );
-
   /* ---------------- CSV ---------------- */
 
   function exportCSV() {
     const header =
       "username,text,likes,retweets,replies,views,timestamp\n";
-
     const rows = tweets
       .map((t) =>
         [
@@ -155,10 +164,7 @@ export default function Dashboard() {
       )
       .join("\n");
 
-    const blob = new Blob([header + rows], {
-      type: "text/csv",
-    });
-
+    const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -176,12 +182,9 @@ export default function Dashboard() {
             Twitter Analytics Dashboard
           </h1>
           <p className="text-slate-400 text-sm">
-            Scrape, analyze & measure engagement
+            Showing most recently scraped data
           </p>
         </div>
-        <p className="text-sm text-gray-400">
-  Showing most recently scraped data
-</p>
 
         {/* Controls */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex gap-3">
@@ -193,7 +196,8 @@ export default function Dashboard() {
           />
           <button
             onClick={handleScrape}
-            className="bg-violet-600 hover:bg-violet-500 transition px-6 py-2 rounded-lg font-medium"
+            disabled={loading}
+            className="bg-violet-600 hover:bg-violet-500 transition px-6 py-2 rounded-lg font-medium disabled:opacity-60"
           >
             {loading ? "Scraping…" : "Scrape"}
           </button>
@@ -206,7 +210,7 @@ export default function Dashboard() {
         </div>
 
         {/* Analytics */}
-        <div className="grid md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCard label="Total Tweets" value={totalTweets} />
           <StatCard label="Avg Engagement" value={avgEngagement} />
           <StatCard label="Avg Views" value={avgViews} />
@@ -214,10 +218,31 @@ export default function Dashboard() {
             label="Avg Engagement Rate"
             value={`${avgEngagementRate}%`}
           />
+
+          
         </div>
+        {topTweet && (
+            <div className="md:col-span-1 bg-gradient-to-br from-violet-600/20 to-slate-900 border border-violet-500/40 rounded-xl p-5">
+              <p className="text-xs uppercase tracking-wide text-violet-400">
+                Most Engaging Tweet
+              </p>
+              <p className="font-medium mt-1">
+                @{topTweet.username}
+              </p>
+              <p className="text-slate-400 text-sm mt-2 line-clamp-3">
+                {topTweet.text}
+              </p>
+              <p className="mt-3 text-violet-300 font-semibold">
+                Engagement{" "}
+                {topTweet.likes +
+                  topTweet.retweets +
+                  topTweet.replies}
+              </p>
+            </div>
+          )}
 
         {/* Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 h-72 pb-10">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 h-72">
           <h2 className="text-lg font-medium mb-4">
             Tweets per Hour
           </h2>
@@ -249,9 +274,9 @@ export default function Dashboard() {
               <tr>
                 <th className="px-4 py-3 text-left">User</th>
                 <th className="px-4 py-3 text-left">Tweet</th>
-                <th className="px-4 py-3 text-center">Like</th>
-                <th className="px-4 py-3 text-center">Reposts</th>
-                <th className="px-4 py-3 text-center">Comments</th>
+                <SortableTh label="Likes" active={sortKey === "likes"} order={sortOrder} onClick={() => handleSort("likes")} />
+                <SortableTh label="Reposts" active={sortKey === "retweets"} order={sortOrder} onClick={() => handleSort("retweets")} />
+                <SortableTh label="Comments" active={sortKey === "replies"} order={sortOrder} onClick={() => handleSort("replies")} />
                 <th className="px-4 py-3 text-center">Views</th>
                 <th className="px-4 py-3 text-left">Time</th>
               </tr>
@@ -262,24 +287,14 @@ export default function Dashboard() {
                   key={t.id}
                   className="border-t border-slate-800 hover:bg-slate-800 transition"
                 >
-                  <td className="px-4 py-3 font-medium">
-                    @{t.username}
-                  </td>
+                  <td className="px-4 py-3 font-medium">@{t.username}</td>
                   <td className="px-4 py-3 max-w-xl text-slate-400">
                     {t.text}
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    {t.likes}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {t.retweets}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {t.replies}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {t.views}
-                  </td>
+                  <td className="px-4 py-3 text-center">{t.likes}</td>
+                  <td className="px-4 py-3 text-center">{t.retweets}</td>
+                  <td className="px-4 py-3 text-center">{t.replies}</td>
+                  <td className="px-4 py-3 text-center">{t.views}</td>
                   <td className="px-4 py-3 text-slate-400">
                     {new Date(t.timestamp).toLocaleString()}
                   </td>
@@ -314,6 +329,8 @@ export default function Dashboard() {
   );
 }
 
+/* ---------------- COMPONENTS ---------------- */
+
 function StatCard({
   label,
   value,
@@ -324,9 +341,28 @@ function StatCard({
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-violet-500 transition">
       <p className="text-slate-400 text-sm">{label}</p>
-      <p className="text-3xl font-semibold mt-1">
-        {value}
-      </p>
+      <p className="text-3xl font-semibold mt-1">{value}</p>
     </div>
+  );
+}
+
+function SortableTh({
+  label,
+  active,
+  order,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  order: "asc" | "desc";
+  onClick: () => void;
+}) {
+  return (
+    <th
+      onClick={onClick}
+      className="px-4 py-3 text-center cursor-pointer hover:text-violet-400 md:w-1/12 gap-2"
+    >
+      {label} {active && (order === "asc" ? "↑" : "↓")}
+    </th>
   );
 }

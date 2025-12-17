@@ -1,17 +1,15 @@
-import fs from "fs";
-import path from "path";
+import { readTweets } from "@/lib/storage/jsonStore";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const filePath = path.join(
-    process.cwd(),
-    "public",
-    "data",
-    "tweets.json"
-  );
-
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const tweets = JSON.parse(raw);
-
-  return NextResponse.json(tweets);
+  try {
+    const tweets = readTweets();
+    return NextResponse.json(tweets);
+  } catch (err) {
+    console.error("Failed to read tweets", err);
+    return NextResponse.json(
+      { error: "Failed to load tweets" },
+      { status: 500 }
+    );
+  }
 }
