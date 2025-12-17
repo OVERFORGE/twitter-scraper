@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import * as cheerio from "cheerio";
-
+import type { Cheerio  } from "cheerio";
+import type { AnyNode } from "domhandler";
 function parseCount(text: string): number {
   if (!text) return 0;
 
@@ -13,7 +14,7 @@ function parseCount(text: string): number {
 }
 
 function extractCountFromAria(
-  element: cheerio.Cheerio,
+  element: Cheerio<AnyNode>,
   testId: string
 ): number {
   const aria = element
@@ -37,7 +38,7 @@ function extractCountFromAria(
  * Twitter often renders views as:
  * <span aria-label="12,345 Views">
  */
-function extractViews(element: cheerio.Cheerio): number {
+function extractViews(element: Cheerio<AnyNode>): number {
   let views = 0;
 
   element.find("span[aria-label]").each((_, el) => {
