@@ -179,6 +179,9 @@ export default function Dashboard() {
             Scrape, analyze & measure engagement
           </p>
         </div>
+        <p className="text-sm text-gray-400">
+  Showing most recently scraped data
+</p>
 
         {/* Controls */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex gap-3">
